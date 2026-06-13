@@ -1,0 +1,6 @@
+board_manager:
+  additional_urls: []
+directories:
+  user: "C:\\Users\\gerom\\Desktop\\Moony Blockly V01\\resources\\arduino"
+logging:
+  level: "info"

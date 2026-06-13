@@ -1,0 +1,332 @@
+/* =========================================================
+   Moony Blockly – style.css (aufgeräumt + stabil)
+   - keine doppelten Regeln
+   - sauberes Layout (Topbar + Main)
+   - robuster Block↔Code View über body.showCode
+   - Blockly HTML-Input bleibt funktionsfähig (nicht verstecken / nicht blockieren)
+   - FIX: KEIN riesiges Eingabefenster (blocklyHtmlInput NICHT fixed!)
+   - FIX: Dropdown springt NICHT mehr beim Scrollen/hover über Text
+   ========================================================= */
+
+:root {
+  /* 🎨 Farbpalette – Night Sky + Moon Beige Highlights */
+  --bg:        #111a33;  /* 🌌 Hintergrund */
+  --surface:   #162347;  /* 🔷 Arbeitsfläche */
+  --panel:     #141f3d;  /* 🧭 Topbar */
+  --border:    #E9E1BE;  /* 🌕 Linien */
+  --fg:        #e6ebf5;  /* ✍️ Text */
+  --fg-muted:  #aab6d4;  /* 💬 Sekundärtext */
+  --accent:    #9AC22F;  /* 🟢 Akzent */
+  --highlight: #FF7B00;  /* 🔶 Orange */
+}
+
+/* ---------------------------------------------------------
+   Grundlayout
+--------------------------------------------------------- */
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+  overflow: hidden; /* verhindert doppeltes Scrollen */
+}
+
+/* ---------------------------------------------------------
+   Topbar
+--------------------------------------------------------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Logo */
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo {
+  height: 40px;
+  width: auto;
+}
+
+/* Button-Bar */
+.button-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.button-bar button,
+#btn-connect,
+#btn-upload {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.button-bar button:hover,
+#btn-connect:hover,
+#btn-upload:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.05);
+}
+
+.button-bar button:active,
+#btn-connect:active,
+#btn-upload:active {
+  background: var(--accent);
+  color: #000;
+  transform: scale(0.95);
+}
+
+/* Select */
+#board-select {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------
+   Umschalter 🧱 ↔ 💻
+--------------------------------------------------------- */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 70px;
+  height: 28px;
+  margin-left: 8px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  transition: 0.25s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 3px;
+  background-color: var(--accent);
+  border-radius: 50%;
+  transition: 0.25s;
+}
+
+input:checked + .slider:before {
+  transform: translateX(40px);
+}
+
+.switch-icons {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-between;
+  padding: 0 6px;
+  font-size: 14px;
+  color: var(--fg-muted);
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------
+   Main / View Layout
+   - Wir steuern den Modus über body.showCode
+   - FIX: CodeView darf NICHT unsichtbar drüber liegen
+--------------------------------------------------------- */
+main {
+  position: relative;               /* ✅ wichtig (Layer-Container) */
+  padding: 12px;
+  height: calc(100vh - 56px);       /* falls Topbar-Höhe anders ist: hier anpassen */
+}
+
+/* Beide Views liegen deckungsgleich übereinander */
+#blocklyDiv,
+#codeView {
+  position: absolute;               /* ✅ wichtig */
+  inset: 12px;                      /* ✅ entspricht main padding */
+  width: auto;
+  height: auto;
+}
+
+/* Standard: Blockly sichtbar */
+#blocklyDiv {
+  display: block;
+  pointer-events: auto;
+  z-index: 2;
+}
+
+#codeView {
+  display: none;
+  pointer-events: none;             /* ✅ unsichtbar darf nie Klicks fressen */
+  z-index: 1;
+}
+
+/* Code-Modus: nur Code sichtbar */
+body.showCode #blocklyDiv {
+  display: none;
+  pointer-events: none;
+}
+
+body.showCode #codeView {
+  display: block;
+  pointer-events: auto;
+  z-index: 2;
+}
+
+/* ---------------------------------------------------------
+   Code-Ansicht
+--------------------------------------------------------- */
+#codeView {
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 16px;
+  margin: 0;
+  font-family: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 15px;
+  line-height: 1.5;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+/* ---------------------------------------------------------
+   Blockly-Container (Arbeitsfläche)
+--------------------------------------------------------- */
+#blocklyDiv {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow:
+    0 0 12px rgba(0, 0, 0, 0.2),
+    inset 0 0 6px rgba(255, 255, 255, 0.15);
+}
+
+/* ---------------------------------------------------------
+   Blockly Toolbox / Flyout Styling
+--------------------------------------------------------- */
+.blocklyTreeRow {
+  padding: 8px 12px !important;
+  color: var(--border) !important;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+.blocklyTreeRow:hover {
+  background: rgba(255, 123, 0, 0.15) !important;
+  box-shadow: inset 0 0 6px rgba(255, 123, 0, 0.25);
+}
+
+.blocklyTreeSelected > .blocklyTreeRow {
+  background: rgba(255, 155, 31, 0.25) !important;
+  color: #ffffff !important;
+}
+
+.blocklyFlyout {
+  padding: 6px 8px !important;
+}
+
+.blocklyFlyoutBackground {
+  stroke: var(--highlight) !important;
+  stroke-width: 2px;
+  rx: 6px;
+}
+
+/* ---------------------------------------------------------
+   ✅ Blockly Inputs/Dropdowns: oben halten, aber NICHT fixed
+   -> fixed verursacht "riesiges Eingabefenster"
+--------------------------------------------------------- */
+.blocklyHtmlInput {
+  position: absolute !important;     /* ✅ Blockly erwartet absolute */
+  z-index: 10000 !important;
+  pointer-events: auto !important;
+
+  /* ✅ verhindert optisch “zu groß” */
+  max-width: 220px;
+  width: auto !important;
+  height: auto !important;
+  font-size: 14px;
+  padding: 2px 4px;
+}
+
+/* Dropdown/Widget Layer ebenfalls nach oben */
+.blocklyWidgetDiv,
+.blocklyDropDownDiv {
+  z-index: 9999 !important;
+}
+
+/* ---------------------------------------------------------
+   FIX: Dropdown springt nicht mehr (kein Scroll/Transform-Zittern)
+--------------------------------------------------------- */
+.blocklyDropDownDiv {
+  transform: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+  -webkit-overflow-scrolling: auto !important;
+}
+
+.blocklyDropDownDiv .blocklyMenu,
+.blocklyDropDownDiv .blocklyMenuItem {
+  transform: none !important;
+  transition: none !important;
+}
+
+/* ---------------------------------------------------------
+   FIX: Dropdown-Auswahl springt beim Scrollen/hover über Text
+   Ursache: innere Elemente fangen Mouse-Events ab → Offset
+   Lösung: nur das MenuItem selbst soll Pointer-Events bekommen
+--------------------------------------------------------- */
+.blocklyDropDownDiv .blocklyMenuItemContent,
+.blocklyDropDownDiv .blocklyMenuItemCheckbox,
+.blocklyDropDownDiv .blocklyMenuItemImage,
+.blocklyDropDownDiv .blocklyMenuItem span,
+.blocklyDropDownDiv .blocklyMenuItem div {
+  pointer-events: none !important;
+}
+
+/* Der Menüeintrag selbst bleibt klickbar */
+.blocklyDropDownDiv .blocklyMenuItem {
+  pointer-events: auto !important;
+}
+
+/* Optional: stabilere Zeilenhöhe */
+.blocklyDropDownDiv .blocklyMenuItem {
+  line-height: 22px !important;
+}

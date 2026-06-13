@@ -1,0 +1,60 @@
+{
+  "name": "moony-blockly",
+  "version": "1.0.0",
+  "description": "Moony Blockly – visuelle Programmierumgebung für Arduino",
+  "author": "Gero Mooslechner",
+  "license": "MIT",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --publish=never"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "at.moony.blockly",
+    "productName": "Moony Blockly",
+    "directories": {
+      "output": "dist",
+      "buildResources": "resources"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "resources/arduino/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/arduino/",
+        "to": "resources/arduino"
+      }
+    ],
+    "win": {
+      "icon": "resources/moony-transparent.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "certificateFile": null,
+      "certificatePassword": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Moony Blockly",
+   "installerIcon": "resources/moony-transparent.ico",
+   "uninstallerIcon": "resources/moony-transparent.ico",
+   "installerHeader": "resources/moony-header-transparent.png",
+   "installerSidebar": "resources/moony-sidebar-transparent.png"
+    }
+  }
+}

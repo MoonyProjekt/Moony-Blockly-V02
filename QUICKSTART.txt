@@ -1,0 +1,95 @@
+╔════════════════════════════════════════════════════════════════╗
+║           MOONY BLOCKLY INSTALLER - QUICK START              ║
+║                                                                ║
+║ Deutsch / German                                              ║
+╚════════════════════════════════════════════════════════════════╝
+
+🎯 DAS ZIEL:
+  → Windows-Installer bauen (.exe-Datei)
+  → Installation OHNE Admin-Rechte
+  → Arduino-Treiber automatisch installieren
+
+───────────────────────────────────────────────────────────────
+
+⏱️  ZEITPLAN:
+  Schritt 1 (Treiber):  2-5 Minuten (optional)
+  Schritt 2 (npm):      3-5 Minuten
+  Schritt 3 (Build):    2-5 Minuten
+  TOTAL:               ~10-15 Minuten
+
+───────────────────────────────────────────────────────────────
+
+📋 SCHRITT-FÜR-SCHRITT:
+
+  1️⃣  CH340 TREIBER (Optional)
+      Download: https://wch-ic.com/downloads/ch341ser_exe.html
+      Ablegen in: resources/drivers/ch340/CH340SER.exe
+      ⏱️  2-5 Min
+
+  2️⃣  NPM INSTALL
+      Öffne Kommandozeile im Projektordner:
+      
+      npm install
+      
+      Warte bis fertig (grüner Haken oder "added X packages")
+      ⏱️  3-5 Min
+
+  3️⃣  INSTALLER BAUEN
+      Doppelklick auf: build-installer.bat
+      
+      Fenster öffnet sich, zeigt Fortschritt
+      Warte auf: "BUILD SUCCESSFUL!"
+      
+      Installer entsteht in: dist/Moony-Blockly-1.0.0-Setup.exe
+      ⏱️  2-5 Min
+
+───────────────────────────────────────────────────────────────
+
+✅ FERTIG!
+
+  Installer Datei: dist/Moony-Blockly-1.0.0-Setup.exe
+  
+  Jetzt kannst du ihn:
+  ✓ Testen (Doppelklick, durchklicken)
+  ✓ An Schüler verteilen (USB-Stick oder Download)
+  ✓ In Schulen installieren (Installation sehr schnell)
+
+───────────────────────────────────────────────────────────────
+
+🆘 HÄUFIGE FEHLER:
+
+  ❌ "npm: command not found"
+     → Node.js nicht installiert
+     → Lösung: https://nodejs.org (v18+)
+     
+  ❌ "NSIS not found"
+     → NSIS nicht installiert
+     → Lösung: https://nsis.sourceforge.io
+     
+  ❌ "CH340 driver not found"
+     → Warnung, nicht kritisch!
+     → Treiber später manuell installierbar
+     
+  ❌ Build bricht ab
+     → Schau in npm-Ausgabe für Fehler
+     → Versuche: npm install --legacy-peer-deps
+     → Oder: Kontakt mit mir
+
+───────────────────────────────────────────────────────────────
+
+📖 WEITERE INFOS:
+
+  BUILD_GUIDE.md          ← Detaillierte Anleitung (Deutsch)
+  INSTALLER-CHECKLIST.md  ← Test-Checkliste vor Deploy
+  PHASE1-SUMMARY.md       ← Zusammenfassung was erstellt wurde
+
+───────────────────────────────────────────────────────────────
+
+🌙 READY TO BUILD?
+
+  Alles vorbereitet, folge den 3 Schritten oben! 🚀
+
+───────────────────────────────────────────────────────────────
+
+  Made with ❤️ for Gero & MOONY BLOCKLY
+  Questions? → Read BUILD_GUIDE.md or contact me!
