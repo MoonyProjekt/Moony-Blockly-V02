@@ -37,68 +37,152 @@
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
-  /* ---------- Block-Erkennung ---------- */
+  /* ---------- Block-Erkennung (alle Arbeitsflächen) ---------- */
 
-  // Oberste Blöcke der Arbeitsfläche
-  function topBlocks() {
-    try {
-      var ws = window.workspace;
-      if (!ws) return [];
-      if (ws.getTopBlocks) return ws.getTopBlocks(false) || [];
-      if (ws.getAllBlocks) return ws.getAllBlocks(false) || [];
-      return [];
-    } catch (e) { return []; }
+  // Alle bekannten Arbeitsflächen einsammeln (window.workspace, Hauptfläche,
+  // und alle registrierten Workspaces).
+  function alleWorkspaces() {
+    var list = [], seen = [];
+    function add(w) { if (w && seen.indexOf(w) < 0) { seen.push(w); list.push(w); } }
+    try { add(window.workspace); } catch (e) {}
+    try { if (window.Blockly && Blockly.getMainWorkspace) add(Blockly.getMainWorkspace()); } catch (e) {}
+    try { if (window.Blockly && Blockly.Workspace && Blockly.Workspace.getAll) {
+      var arr = Blockly.Workspace.getAll() || [];
+      for (var i = 0; i < arr.length; i++) add(arr[i]);
+    } } catch (e) {}
+    return list;
   }
 
-  // ALLE Blöcke inkl. eingehängter Unterblöcke (steigt in jeden Block hinein)
-  function deepBlocks() {
-    var tops = topBlocks();
+  function topBlocks() {
     var out = [];
-    for (var i = 0; i < tops.length; i++) {
-      var b = tops[i];
+    var wss = alleWorkspaces();
+    for (var i = 0; i < wss.length; i++) {
       try {
-        if (b && b.getDescendants) {
-          var d = b.getDescendants(false) || [];
-          for (var j = 0; j < d.length; j++) if (out.indexOf(d[j]) < 0) out.push(d[j]);
-        } else if (b && out.indexOf(b) < 0) {
-          out.push(b);
-        }
-      } catch (e) { /* Block im Umbau – überspringen */ }
+        var w = wss[i];
+        var t = w.getTopBlocks ? (w.getTopBlocks(false) || []) :
+                (w.getAllBlocks ? (w.getAllBlocks(false) || []) : []);
+        for (var j = 0; j < t.length; j++) out.push(t[j]);
+      } catch (e) {}
     }
     return out;
   }
 
+  function kinderVon(b) {
+    try { if (b && b.getChildren) return b.getChildren(false) || []; } catch (e) {}
+    return [];
+  }
+
+  // Sammelt ALLE Blöcke aus ALLEN Arbeitsflächen – über getAllBlocks und
+  // über eigene Rekursion (getChildren). Unabhängig von getDescendants.
+  function alleBlocke() {
+    var seen = [], out = [];
+    function push(b) { if (b && seen.indexOf(b) < 0) { seen.push(b); out.push(b); } }
+    function rec(b) { if (!b || seen.indexOf(b) >= 0) return; push(b); var k = kinderVon(b); for (var i = 0; i < k.length; i++) rec(k[i]); }
+    var wss = alleWorkspaces();
+    for (var i = 0; i < wss.length; i++) {
+      var w = wss[i];
+      try { if (w.getAllBlocks) { var ab = w.getAllBlocks(false) || []; for (var j = 0; j < ab.length; j++) push(ab[j]); } } catch (e) {}
+      try { if (w.getTopBlocks) { var tb = w.getTopBlocks(false) || []; for (var k = 0; k < tb.length; k++) rec(tb[k]); } } catch (e) {}
+    }
+    return out;
+  }
+
+  function elternVon(b) {
+    try { if (b.getParent) { var p = b.getParent(); if (p) return p; } } catch (e) {}
+    try { if (b.previousConnection && b.previousConnection.targetBlock) { var t = b.previousConnection.targetBlock(); if (t) return t; } } catch (e) {}
+    try { if (b.outputConnection && b.outputConnection.targetBlock) { var o = b.outputConnection.targetBlock(); if (o) return o; } } catch (e) {}
+    return null;
+  }
+
   function blockVorhanden(type) {
-    var all = deepBlocks();
+    var all = alleBlocke();
+    for (var i = 0; i < all.length; i++) if (all[i] && all[i].type === type) return true;
+    return false;
+  }
+
+  function blockIn(childType, parentType) {
+    var all = alleBlocke();
     for (var i = 0; i < all.length; i++) {
-      if (all[i] && all[i].type === type) return true;
+      var b = all[i];
+      if (!b || b.type !== childType) continue;
+      var p = elternVon(b), schutz = 0;
+      while (p && schutz < 300) {
+        if (p.type === parentType) return true;
+        p = elternVon(p); schutz++;
+      }
     }
     return false;
   }
 
-  // Erfüllt, wenn ein Block vom Typ childType IRGENDWO innerhalb eines
-  // Blocks vom Typ parentType eingehängt ist (egal wie tief).
-  function blockIn(childType, parentType) {
-    var all = deepBlocks();
-    for (var i = 0; i < all.length; i++) {
-      var p = all[i];
-      try {
-        if (p && p.type === parentType && p.getDescendants) {
-          var d = p.getDescendants(false) || [];
-          for (var j = 0; j < d.length; j++) {
-            if (d[j] && d[j] !== p && d[j].type === childType) return true;
-          }
-        }
-      } catch (e) { /* Block im Umbau – überspringen */ }
-    }
-    return false;
+  // Erzeugt den Arduino-Code (das ist die "Wahrheit" über das Programm) und
+  // stößt dabei zugleich an, dass Blockly schwebende Blöcke übernimmt.
+  function erzeugeCode() {
+    try {
+      if (window.Blockly && Blockly.Arduino && Blockly.Arduino.workspaceToCode && window.workspace) {
+        return Blockly.Arduino.workspaceToCode(window.workspace) || "";
+      }
+    } catch (e) {}
+    try {
+      var cv = document.getElementById("codeView");
+      return cv ? (cv.textContent || "") : "";
+    } catch (e) { return ""; }
+  }
+
+  // Schneidet den Inhalt von setup() bzw. loop() aus dem Code heraus.
+  function codeAbschnitt(code, fn) {
+    try {
+      var marker = "void " + fn + "(";
+      var i = code.indexOf(marker);
+      if (i < 0) return "";
+      var brace = code.indexOf("{", i);
+      if (brace < 0) return "";
+      var nextVoid = code.indexOf("void ", brace + 1);
+      return code.slice(brace, nextVoid < 0 ? code.length : nextVoid);
+    } catch (e) { return ""; }
+  }
+
+  // Code-Signatur für bekannte Blocktypen (Ersatzweg, falls die Blockliste
+  // einen Block gerade nicht zurückgibt). Erweiterbar.
+  var CODE_SIGNATUR = {
+    "sound_beep": "tone(",
+    "sound_signal": "tone(",
+    "led_set": "digitalWrite("
+  };
+  // parentType -> Code-Funktion
+  function funktionVon(parentType) {
+    if (parentType === "program_start_once") return "setup";
+    if (parentType === "program_start_forever") return "loop";
+    if (parentType === "program_loop_forever") return "loop";
+    return null;
   }
 
   // Prüft eine Regel aus missions_data.js. Ohne Regel: immer erfüllt (manuell).
   function pruefungErfuellt(p) {
     if (!p) return true;
-    if (p.typ === "block_vorhanden") return blockVorhanden(p.block);
-    if (p.typ === "block_in") return blockIn(p.block, p["in"]);
+
+    // Code einmal erzeugen – das übernimmt zugleich schwebende Blöcke.
+    var code = erzeugeCode();
+
+    if (p.typ === "block_vorhanden") {
+      if (blockVorhanden(p.block)) return true;
+      // Ersatzweg über Code:
+      var sig = p.code || CODE_SIGNATUR[p.block];
+      if (sig && code.indexOf(sig) >= 0) return true;
+      return false;
+    }
+
+    if (p.typ === "block_in") {
+      if (blockIn(p.block, p["in"])) return true;
+      // Ersatzweg: Signatur des Kind-Blocks im richtigen Code-Abschnitt suchen
+      var sig2 = p.code || CODE_SIGNATUR[p.block];
+      var fn = funktionVon(p["in"]);
+      if (sig2 && fn) {
+        var abschnitt = codeAbschnitt(code, fn);
+        if (abschnitt.indexOf(sig2) >= 0) return true;
+      }
+      return false;
+    }
+
     if (p.typ === "hochgeladen") return uploadCount > uploadBaseline;
     return true;
   }
@@ -175,6 +259,7 @@
     html += '<div class="m-scan" id="m-scan"></div>';
     html += energyBar();
     html += '<div class="terminal-actions"><button class="m-btn primary" id="m-weiter">' + esc(s.knopf || "Weiter") + '</button></div>';
+    html += '<pre id="m-debug" style="margin-top:14px;padding:8px;font-size:11px;line-height:1.4;white-space:pre-wrap;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#ffd479;overflow-x:auto;"></pre>';
     panel.innerHTML = html; bind();
     refreshDetection();
   }
@@ -183,6 +268,28 @@
     panel.innerHTML = '<div class="terminal-head"><span class="terminal-title">Missionsterminal</span></div>' +
       bubble("Alle Missionen geschafft, Operator. Stark!") + energyBar();
   }
+
+  // ---- DIAGNOSE ----
+  function typeOf(b) { return b ? b.type : "—"; }
+  function debugStruktur() {
+    try {
+      var lines = [];
+      var wss = alleWorkspaces();
+      for (var i = 0; i < wss.length; i++) {
+        var ab = [];
+        try { ab = wss[i].getAllBlocks ? (wss[i].getAllBlocks(false) || []) : []; } catch (e) {}
+        lines.push("WS#" + i + ": " + ab.length + " [" + ab.map(typeOf).join(", ") + "]");
+      }
+      var all = alleBlocke();
+      lines.push("zusammengeführt: [" + all.map(typeOf).join(", ") + "]");
+      var code = erzeugeCode();
+      lines.push("--- CODE (" + code.length + " Z.) ---");
+      lines.push(code.slice(0, 350));
+      lines.push("tone( in setup: " + (codeAbschnitt(code, "setup").indexOf("tone(") >= 0));
+      return lines.join("\n");
+    } catch (e) { return "Diagnose-Fehler: " + e.message; }
+  }
+
 
   // Aktualisiert nur Knopf + Scan-Zeile (ohne Flackern), während gearbeitet wird.
   // Komplett absturzsicher: ein Fehler darf die Live-Erkennung nie lahmlegen.
@@ -196,14 +303,19 @@
 
       var btn = document.getElementById("m-weiter");
       var scan = document.getElementById("m-scan");
+      var dbg = document.getElementById("m-debug");
+      if (dbg) dbg.textContent = debugStruktur();
       if (!btn) return;
 
-      if (!s.pruefung) { btn.disabled = false; if (scan) scan.textContent = ""; return; }
+      // Knopf bleibt IMMER klickbar – Erkennung ist nur ein Hinweis,
+      // damit niemand stecken bleibt, falls sie mal hakt.
+      btn.disabled = false;
+
+      if (!s.pruefung) { if (scan) scan.textContent = ""; return; }
 
       var ok = pruefungErfuellt(s.pruefung);
-      btn.disabled = !ok;
       if (scan) {
-        scan.textContent = ok ? "✔ Erkannt – bestätige, wenn du bereit bist." : "⏳ Moony scannt die Blöcke …";
+        scan.textContent = ok ? "✔ Erkannt – bestätige, wenn du bereit bist." : "⏳ Moony scannt … (du kannst trotzdem bestätigen)";
         scan.className = ok ? "m-scan ok" : "m-scan";
       }
     } catch (e) {
