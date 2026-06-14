@@ -2,24 +2,41 @@
    MOONY – MISSIONS-INHALTE
    ------------------------------------------------------------
    Das ist die Datei, die DU selbst pflegst.
-   Du musst hier keinen "echten" Code schreiben – nur Texte
-   zwischen den Anführungszeichen ändern und neue Schritte
-   nach dem gleichen Muster ergänzen.
-
-   AUFBAU EINER MISSION:
-     id        = Nummer der Mission (z. B. "1.1")
-     titel     = kurzer Name
-     intro     = Moonys erster Funkspruch (wird zuerst gezeigt)
-     schritte  = Liste der Aufgaben, der Reihe nach
+   Du änderst nur Texte zwischen den Anführungszeichen und
+   ergänzt neue Schritte nach dem gleichen Muster.
 
    ZWEI ARTEN VON SCHRITTEN:
-     typ: "anweisung"      -> Moony sagt etwas, Schüler macht es,
-                              klickt dann auf den Weiter-Knopf.
-     typ: "bestaetigung"   -> Moony fragt nach, Schüler antwortet
-                              mit "Ja" oder "Nein".
+     typ: "anweisung"     -> Moony sagt etwas. Wenn eine Prüfregel
+                             gesetzt ist, bleibt der Knopf gesperrt,
+                             bis der richtige Block erkannt wird.
+                             Dann bestätigt der Schüler mit Klick.
+     typ: "bestaetigung"  -> Moony fragt nach (Ja / Nein).
 
-   energie = wie viel Energie Moony nach dem Schritt dazugewinnt
-             (0 bis 100 insgesamt).
+   PRÜFREGELN (optional, nur bei "anweisung"):
+     pruefung: { typ: "block_vorhanden", block: "program_start_once" }
+        -> erfüllt, wenn dieser Block irgendwo liegt.
+
+     pruefung: { typ: "block_in", block: "sound_beep", in: "program_start_once" }
+        -> erfüllt, wenn der erste Block IM zweiten Block steckt.
+
+     pruefung: { typ: "hochgeladen" }
+        -> erfüllt, sobald in diesem Schritt auf 🚀 Hochladen geklickt wurde.
+
+     Ohne "pruefung" ist der Knopf immer freigegeben (manuell).
+
+   BLOCK-NAMEN (die wichtigsten):
+     Start (läuft einmal) ...... program_start_once
+     Start (läuft unendlich) ... program_start_forever
+     wiederhole fortlaufend .... program_loop_forever
+     Buzzer .................... sound_beep
+     spiele Signal ............. sound_signal
+     warte ..................... time_wait
+     LED an/aus ................ led_set
+     Wenn ...................... moony_if_simple
+     Taster gedrückt ........... sensor_button_pressed
+     Abstand HC-SR04 ........... sensor_hcsr04_distance
+
+   energie = Energiegewinn nach dem Schritt (gesamt 0..100).
    ============================================================ */
 
 window.MOONY_MISSIONS = [
@@ -35,6 +52,7 @@ window.MOONY_MISSIONS = [
         typ: "anweisung",
         moony: "Ich brauche einen Startbefehl, damit mein System aufwacht. Zieh den Block »Start (läuft einmal)« auf die Arbeitsfläche.",
         aufgabe: "Start-Block setzen",
+        pruefung: { typ: "block_vorhanden", block: "program_start_once" },
         knopf: "Erledigt",
         energie: 10
       },
@@ -43,6 +61,7 @@ window.MOONY_MISSIONS = [
         typ: "anweisung",
         moony: "Strom! Ich spür's! Jetzt gib mir ein Lebenszeichen – setz einen »Buzzer«-Block in den Start-Block. Ich will piepen!",
         aufgabe: "Buzzer in den Start setzen (Pin 2)",
+        pruefung: { typ: "block_in", block: "sound_beep", in: "program_start_once" },
         knopf: "Erledigt",
         energie: 10
       },
@@ -51,6 +70,7 @@ window.MOONY_MISSIONS = [
         typ: "anweisung",
         moony: "Bereit zum Senden, Operator. Schick mir den Befehl rüber – drück oben auf 🚀 Hochladen!",
         aufgabe: "Code hochladen",
+        pruefung: { typ: "hochgeladen" },
         knopf: "Hochgeladen",
         energie: 10
       },
