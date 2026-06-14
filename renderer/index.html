@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Moony Blockly</title>
   <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/mission.css" />
 </head>
 
 <body>
@@ -47,6 +48,7 @@
   <main>
     <div id="blocklyDiv"></div>
     <pre id="codeView"></pre>
+    <div id="missionPanel" aria-live="polite"></div>
   </main>
 
   <!-- 🧰 TOOLBOX -->
@@ -233,5 +235,9 @@
 <script src="js/blocks_communication.js"></script>
 
   <script src="js/main.js"></script>
+
+  <!-- Missionsterminal -->
+  <script src="js/missions_data.js"></script>
+  <script src="js/mission_engine.js"></script>
 </body>
 </html>

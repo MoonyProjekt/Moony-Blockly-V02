@@ -1,0 +1,110 @@
+/* ============================================================
+   MOONY – MISSIONSTERMINAL (Styles, Phase A)
+   Nutzt die vorhandenen Theme-Variablen (--surface, --border,
+   --fg, --bg), damit es zum dunklen Design passt.
+   ============================================================ */
+
+/* Panel ist standardmäßig versteckt; wird per body.mission-active gezeigt */
+#missionPanel { display: none; }
+
+/* Wenn eine Mission läuft: Blockfläche links schmaler machen,
+   Panel rechts einblenden */
+body.mission-active #blocklyDiv,
+body.mission-active #codeView {
+  right: 364px;            /* 340px Panel + 12px Abstand + 12px Rand */
+}
+
+body.mission-active #missionPanel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: 340px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  overflow-y: auto;
+  z-index: 3;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--fg);
+}
+
+/* Kopf */
+.terminal-head { display: flex; flex-direction: column; gap: 2px; }
+.terminal-title {
+  font-size: 12px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; opacity: .6;
+}
+.terminal-mission { font-size: 13px; font-weight: 600; opacity: .85; }
+
+/* Moony-Sprechblase */
+.moony-row { display: flex; gap: 10px; align-items: flex-start; }
+.moony-face {
+  flex: none; width: 40px; height: 40px; border-radius: 50%;
+  background: #16324d; border: 1px solid #2f6da3;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+}
+.moony-face span {
+  width: 6px; height: 6px; border-radius: 50%; background: #5fb3ff;
+  animation: moony-blink 4s infinite;
+}
+@keyframes moony-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.15); }
+}
+.moony-bubble {
+  background: #16324d; color: #d7ecff;
+  border-radius: 10px; padding: 10px 12px;
+  font-size: 14px; line-height: 1.5;
+}
+
+/* Ziele */
+.ziele { display: flex; flex-direction: column; gap: 2px; }
+.ziel {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; padding: 4px 0; opacity: .55;
+}
+.ziel-icon { font-size: 14px; line-height: 1; }
+.ziel.active { opacity: 1; font-weight: 600; }
+.ziel.active .ziel-icon { color: #e3a008; }
+.ziel.done { opacity: .8; text-decoration: line-through; }
+.ziel.done .ziel-icon { color: #1d9e75; }
+
+/* Energieleiste */
+.energy { margin-top: auto; }
+.energy-label {
+  display: flex; justify-content: space-between;
+  font-size: 12px; opacity: .7; margin-bottom: 4px;
+}
+.energy-track {
+  height: 8px; border-radius: 99px; overflow: hidden;
+  background: rgba(255,255,255,.12);
+}
+.energy-fill {
+  height: 100%; background: #1d9e75;
+  transition: width .5s ease;
+}
+
+/* Knöpfe */
+.terminal-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.m-btn {
+  flex: 1; min-width: 110px;
+  font-size: 14px; padding: 9px 12px;
+  border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent; color: var(--fg);
+}
+.m-btn:hover { background: rgba(255,255,255,.06); }
+.m-btn:active { transform: scale(.98); }
+.m-btn.primary {
+  background: #1d9e75; border-color: #1d9e75; color: #fff;
+}
+.m-btn.primary:hover { background: #18876333; background: #178763; }
+.m-done {
+  flex: 1; text-align: center; font-size: 14px;
+  color: #1d9e75; font-weight: 600; padding: 9px 12px;
+}
