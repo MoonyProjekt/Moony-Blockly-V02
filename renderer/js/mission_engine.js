@@ -1,11 +1,12 @@
 /* ============================================================
-   MOONY – MISSIONSTERMINAL (Engine, Phase B)
+   MOONY – MISSIONSTERMINAL (Engine, Phase B+C)
    ------------------------------------------------------------
-   Diese Datei NICHT bearbeiten. Neu in Phase B:
-     - erkennt automatisch, ob der richtige Block gesetzt ist
-       (der Weiter-Knopf bleibt gesperrt, bis Moony ihn sieht)
-     - erkennt, ob hochgeladen wurde
-     - Ein-/Ausblenden-Knopf (📡) in der Kopfleiste
+   Phase B: Block-Erkennung, Polling, Energieleiste
+   Phase C: Sprachausgabe (Web Speech API, Chromium built-in)
+     - 🔊/🔇-Knopf in der Kopfleiste schaltet Stimme ein/aus
+     - Einstellung wird gespeichert (localStorage)
+     - Funktioniert ohne Audiodateien, liest jeden Text automatisch
+     - Deutsche Stimme wird bevorzugt (auf Windows fast immer vorhanden)
    Texte stehen in: missions_data.js
    ============================================================ */
 (function () {
@@ -21,6 +22,51 @@
   var hinweis = "";        // optionaler Hinweis (nach "Nein")
   var uploadCount = 0;     // wie oft wurde "Hochladen" geklickt
   var uploadBaseline = 0;  // Stand beim Betreten des aktuellen Schritts
+
+  /* ---------- Sprachausgabe (Phase C) ---------- */
+
+  var ttsOn = (localStorage.getItem("moony-tts") === "1");
+  var ttsVoice = null;
+  var ttsLastKey = "";  // verhindert doppeltes Sprechen beim erneuten render()
+
+  function initTTS() {
+    if (!window.speechSynthesis) return;
+    function ladeStimmen() {
+      var stimmen = window.speechSynthesis.getVoices() || [];
+      // Deutsche Stimme bevorzugen, sonst erste verfügbare
+      ttsVoice = stimmen.find(function (v) { return v.lang && v.lang.startsWith("de"); })
+               || stimmen[0] || null;
+    }
+    ladeStimmen();
+    // Chrome lädt Stimmen asynchron – nochmal laden sobald bereit
+    if (window.speechSynthesis.addEventListener) {
+      window.speechSynthesis.addEventListener("voiceschanged", ladeStimmen);
+    }
+  }
+
+  // text  = der gesprochene Text
+  // key   = eindeutiger Schlüssel (verhindert Wiederholung bei erneutem render)
+  function spreche(text, key) {
+    if (!ttsOn || !window.speechSynthesis || !text) return;
+    key = key || text;
+    if (key === ttsLastKey) return;   // derselbe Text wird nicht wiederholt
+    ttsLastKey = key;
+    window.speechSynthesis.cancel();  // laufende Sprache stoppen
+    var u = new SpeechSynthesisUtterance(text);
+    u.lang = "de-DE";
+    u.rate = 0.92;   // minimal langsamer als Standard – besser verständlich
+    u.pitch = 1.05;  // leicht höher für Moonys Charakter
+    if (ttsVoice) u.voice = ttsVoice;
+    window.speechSynthesis.speak(u);
+  }
+
+  function toggleTTS() {
+    ttsOn = !ttsOn;
+    localStorage.setItem("moony-tts", ttsOn ? "1" : "0");
+    if (!ttsOn && window.speechSynthesis) window.speechSynthesis.cancel();
+    ttsLastKey = ""; // nach Toggle: aktuellen Text neu sprechen
+    render();        // Knopf-Symbol aktualisieren
+  }
 
   function clamp(n) { return Math.max(0, Math.min(100, n)); }
 
@@ -230,9 +276,12 @@
     return html + '</div>';
   }
   function header(m) {
+    var ttsSymbol = ttsOn ? "🔊" : "🔇";
     return '<div class="terminal-head">' +
       '<span class="terminal-title">Missionsterminal</span>' +
-      '<span class="terminal-mission">Mission ' + esc(m.id) + ' — ' + esc(m.titel) + '</span></div>';
+      '<span class="terminal-mission">Mission ' + esc(m.id) + ' — ' + esc(m.titel) + '</span>' +
+      '<button id="btn-tts" title="Sprachausgabe ein/aus" style="background:none;border:none;cursor:pointer;font-size:15px;opacity:0.75;padding:2px 6px;margin-left:auto;flex-shrink:0;">' + ttsSymbol + '</button>' +
+      '</div>';
   }
 
   /* ---------- Rendern ---------- */
@@ -246,7 +295,9 @@
     if (sIndex === -1) { // Intro
       html += bubble(m.intro) + energyBar() +
         '<div class="terminal-actions"><button class="m-btn primary" id="m-start">Bereit, los geht\'s</button></div>';
-      panel.innerHTML = html; bind(); return;
+      panel.innerHTML = html; bind();
+      spreche(m.intro, "i" + mIndex);
+      return;
     }
 
     if (sIndex >= m.schritte.length) { // Abschluss
@@ -256,17 +307,22 @@
         ? '<button class="m-btn primary" id="m-next-mission">Nächste Mission</button>'
         : '<div class="m-done">✔ Mission abgeschlossen</div>';
       html += '</div>';
-      panel.innerHTML = html; bind(); return;
+      panel.innerHTML = html; bind();
+      spreche(m.abschluss || "Mission abgeschlossen!", "d" + mIndex);
+      return;
     }
 
     var s = m.schritte[sIndex];
 
     if (s.typ === "bestaetigung") {
-      html += bubble(hinweis ? hinweis : s.moony) + stepList(m, sIndex) + energyBar() +
+      var bText = hinweis ? hinweis : s.moony;
+      html += bubble(bText) + stepList(m, sIndex) + energyBar() +
         '<div class="terminal-actions">' +
         '<button class="m-btn primary" id="m-yes">' + esc(s.ja || "Ja") + '</button>' +
         '<button class="m-btn" id="m-no">' + esc(s.nein || "Nein") + '</button></div>';
-      panel.innerHTML = html; bind(); return;
+      panel.innerHTML = html; bind();
+      spreche(bText, "b" + mIndex + "-" + sIndex + (hinweis ? "h" : ""));
+      return;
     }
 
     // typ "anweisung"
@@ -275,6 +331,7 @@
     html += energyBar();
     html += '<div class="terminal-actions"><button class="m-btn primary" id="m-weiter">' + esc(s.knopf || "Weiter") + '</button></div>';
     panel.innerHTML = html; bind();
+    spreche(s.moony, "s" + mIndex + "-" + sIndex);
     refreshDetection();
   }
 
@@ -376,6 +433,9 @@
     if (nextM) nextM.onclick = function () {
       mIndex += 1; goTo(-1);
     };
+
+    var ttsBtn = document.getElementById("btn-tts");
+    if (ttsBtn) ttsBtn.onclick = toggleTTS;
   }
 
   /* ---------- Verbindung zur App ---------- */
@@ -410,6 +470,7 @@
         "<p style='font-size:13px;opacity:.7'>Keine Missionen gefunden.</p>";
       return;
     }
+    initTTS();  // Stimmen laden (Phase C)
     document.body.classList.add("mission-active"); // beim Start sichtbar
     resizeBlockly(); setTimeout(resizeBlockly, 300);
     attachListeners();
