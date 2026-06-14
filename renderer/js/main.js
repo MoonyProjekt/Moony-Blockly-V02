@@ -376,6 +376,9 @@
     return code;
   }
 
+  // Für mission_engine.js zugänglich machen – dieselbe Funktion die den Code-View antreibt.
+  window.moonyGenerateCode = generateFullSketch;
+
   // ────────────────────────────────────────────────────────────────
   // 🔁 Block ↔ Code Toggle (CSS via body.showCode)
   // ────────────────────────────────────────────────────────────────

@@ -64,7 +64,7 @@
     init: function () {
       this.appendDummyInput()
         .appendField("Buzzer an Pin")
-        .appendField(new Blockly.FieldNumber(8, 2, 13, 1), "PIN")
+        .appendField(new Blockly.FieldNumber(2, 2, 13, 1), "PIN")
         .appendField("für")
         .appendField(new Blockly.FieldNumber(200, 10, 5000, 1), "DUR")
         .appendField("ms (pip)");
@@ -80,7 +80,7 @@
     init: function () {
       this.appendDummyInput()
         .appendField("Buzzer-Muster an Pin")
-        .appendField(new Blockly.FieldNumber(8, 2, 13, 1), "PIN")
+        .appendField(new Blockly.FieldNumber(2, 2, 13, 1), "PIN")
         .appendField("Zeiten (ms):")
         .appendField(new Blockly.FieldTextInput("200,100,200,500"), "PATTERN");
       this.setPreviousStatement(true, null);
@@ -103,7 +103,7 @@
           ["Endsignal", "END"]
         ]), "SIGNAL")
         .appendField("an Pin")
-        .appendField(new Blockly.FieldNumber(8, 2, 13, 1), "PIN");
+        .appendField(new Blockly.FieldNumber(2, 2, 13, 1), "PIN");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
       applyStyle(this, STYLE_SOUND_BUZZER, "#FF7A00");

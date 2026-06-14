@@ -43,7 +43,15 @@
   // und alle registrierten Workspaces).
   function alleWorkspaces() {
     var list = [], seen = [];
-    function add(w) { if (w && seen.indexOf(w) < 0) { seen.push(w); list.push(w); } }
+    // Nur echte Arbeitsflächen – KEIN Flyout (Werkzeugkiste) und kein Mutator.
+    // Die Flyout-Workspaces enthalten alle verfügbaren Blöcke als Vorlage und
+    // würden die Erkennung verfälschen (z.B. sound_beep immer vorhanden, obwohl
+    // der Schüler ihn noch gar nicht auf die Fläche gezogen hat).
+    function add(w) {
+      if (w && seen.indexOf(w) < 0 && !w.isFlyout && !w.isMutator) {
+        seen.push(w); list.push(w);
+      }
+    }
     try { add(window.workspace); } catch (e) {}
     try { if (window.Blockly && Blockly.getMainWorkspace) add(Blockly.getMainWorkspace()); } catch (e) {}
     try { if (window.Blockly && Blockly.Workspace && Blockly.Workspace.getAll) {
@@ -114,11 +122,18 @@
     return false;
   }
 
-  // Erzeugt den Arduino-Code (das ist die "Wahrheit" über das Programm) und
-  // stößt dabei zugleich an, dass Blockly schwebende Blöcke übernimmt.
+  // Erzeugt den Arduino-Code – benutzt exakt dieselbe Funktion wie der Code-View in main.js.
+  // window.moonyGenerateCode wird von main.js gesetzt (mit init() + workspaceToCode()).
+  // Das ist zuverlässiger als eigene Code-Generierung, weil main.js die Funktion
+  // schon in der richtigen Reihenfolge aufruft.
   function erzeugeCode() {
     try {
+      if (window.moonyGenerateCode) return window.moonyGenerateCode() || "";
+    } catch (e) {}
+    // Notfall-Fallback (falls main.js noch nicht geladen hat):
+    try {
       if (window.Blockly && Blockly.Arduino && Blockly.Arduino.workspaceToCode && window.workspace) {
+        if (Blockly.Arduino.init) Blockly.Arduino.init(window.workspace);
         return Blockly.Arduino.workspaceToCode(window.workspace) || "";
       }
     } catch (e) {}
@@ -160,7 +175,7 @@
   function pruefungErfuellt(p) {
     if (!p) return true;
 
-    // Code einmal erzeugen – das übernimmt zugleich schwebende Blöcke.
+    // Code einmal erzeugen – benutzt window.moonyGenerateCode aus main.js.
     var code = erzeugeCode();
 
     if (p.typ === "block_vorhanden") {
@@ -259,7 +274,6 @@
     html += '<div class="m-scan" id="m-scan"></div>';
     html += energyBar();
     html += '<div class="terminal-actions"><button class="m-btn primary" id="m-weiter">' + esc(s.knopf || "Weiter") + '</button></div>';
-    html += '<pre id="m-debug" style="margin-top:14px;padding:8px;font-size:11px;line-height:1.4;white-space:pre-wrap;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#ffd479;overflow-x:auto;"></pre>';
     panel.innerHTML = html; bind();
     refreshDetection();
   }
@@ -303,23 +317,24 @@
 
       var btn = document.getElementById("m-weiter");
       var scan = document.getElementById("m-scan");
-      var dbg = document.getElementById("m-debug");
-      if (dbg) dbg.textContent = debugStruktur();
       if (!btn) return;
 
-      // Knopf bleibt IMMER klickbar – Erkennung ist nur ein Hinweis,
-      // damit niemand stecken bleibt, falls sie mal hakt.
-      btn.disabled = false;
-
-      if (!s.pruefung) { if (scan) scan.textContent = ""; return; }
+      // Kein Check definiert → Knopf immer frei, kein Scan-Text
+      if (!s.pruefung) { btn.disabled = false; if (scan) scan.textContent = ""; return; }
 
       var ok = pruefungErfuellt(s.pruefung);
+
+      // Harte Erkennung: Knopf gesperrt bis die Bedingung erfüllt ist.
+      // Kein Sicherheitstimer mehr – mit init() ist die Erkennung zuverlässig genug.
+      btn.disabled = !ok;
+
       if (scan) {
-        scan.textContent = ok ? "✔ Erkannt – bestätige, wenn du bereit bist." : "⏳ Moony scannt … (du kannst trotzdem bestätigen)";
+        scan.textContent = ok ? "✔ Erkannt – bestätige, wenn du bereit bist." : "⏳ Moony scannt …";
         scan.className = ok ? "m-scan ok" : "m-scan";
       }
     } catch (e) {
-      /* niemals die Erkennung stoppen */
+      // Niemals abstürzen – bei unerwarteten Fehlern Knopf freigeben
+      try { var b = document.getElementById("m-weiter"); if (b) b.disabled = false; } catch (e2) {}
     }
   }
 
@@ -372,20 +387,18 @@
 
   function attachListeners(tries) {
     tries = tries || 0;
-    // Live-Erkennung bei jeder Änderung in der Blockfläche.
-    // Sofort prüfen UND kurz danach nochmal (für den eingependelten
-    // Zustand nach dem Ziehen/Löschen eines Blocks).
-    if (window.workspace && window.workspace.addChangeListener) {
-      window.workspace.addChangeListener(function () {
-        refreshDetection();
-        setTimeout(refreshDetection, 60);
-      });
+    if (window.workspace) {
+      // ── Polling statt Event-Listener ──────────────────────────────────────────
+      // Blockly's Zelos-Renderer aktualisiert seinen internen Zustand verzögert.
+      // Events feuern zu früh (Blöcke noch nicht registriert).
+      // Lösung: alle 500 ms prüfen – dann ist Blockly garantiert fertig.
+      setInterval(refreshDetection, 500);
     } else if (tries < 20) {
       return setTimeout(function () { attachListeners(tries + 1); }, 250);
     }
-    // "Hochladen"-Klick mitzählen
+    // "Hochladen"-Klick mitzählen (bleibt event-basiert, da kein Timing-Problem)
     var up = document.getElementById("btn-upload");
-    if (up) up.addEventListener("click", function () { uploadCount += 1; setTimeout(refreshDetection, 50); });
+    if (up) up.addEventListener("click", function () { uploadCount += 1; refreshDetection(); });
     // Ein-/Ausblenden-Knopf
     var mb = document.getElementById("btn-mission");
     if (mb) mb.addEventListener("click", togglePanel);
