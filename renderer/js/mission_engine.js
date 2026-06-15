@@ -22,12 +22,14 @@
   var hinweis = "";        // optionaler Hinweis (nach "Nein")
   var uploadCount = 0;     // wie oft wurde "Hochladen" geklickt
   var uploadBaseline = 0;  // Stand beim Betreten des aktuellen Schritts
+  var aktuellerSchueler = localStorage.getItem("moony-aktuell") || "";
 
   /* ---------- Sprachausgabe (Phase C) ---------- */
 
   var ttsOn = (localStorage.getItem("moony-tts") === "1");
   var ttsVoice = null;
   var ttsLastKey = "";  // verhindert doppeltes Sprechen beim erneuten render()
+  var ttsAudio = null;  // aktuell laufende MP3
 
   function initTTS() {
     if (!window.speechSynthesis) return;
@@ -44,26 +46,46 @@
     }
   }
 
-  // text  = der gesprochene Text
-  // key   = eindeutiger Schlüssel (verhindert Wiederholung bei erneutem render)
-  function spreche(text, key) {
-    if (!ttsOn || !window.speechSynthesis || !text) return;
-    key = key || text;
-    if (key === ttsLastKey) return;   // derselbe Text wird nicht wiederholt
-    ttsLastKey = key;
-    window.speechSynthesis.cancel();  // laufende Sprache stoppen
+  // Fallback: Windows-Stimme wenn keine MP3 vorhanden
+  function webSpeechFallback(text) {
+    if (!window.speechSynthesis || !text) return;
+    window.speechSynthesis.cancel();
     var u = new SpeechSynthesisUtterance(text);
-    u.lang = "de-DE";
-    u.rate = 0.92;   // minimal langsamer als Standard – besser verständlich
-    u.pitch = 1.05;  // leicht höher für Moonys Charakter
+    u.lang  = "de-DE";
+    u.rate  = 0.92;
+    u.pitch = 1.05;
     if (ttsVoice) u.voice = ttsVoice;
     window.speechSynthesis.speak(u);
+  }
+
+  // text = der gesprochene Text
+  // key  = eindeutiger Schlüssel (verhindert Wiederholung bei erneutem render)
+  // Versucht zuerst renderer/audio/{key}.mp3 zu spielen.
+  // Wenn die Datei fehlt → automatisch Windows-Stimme als Fallback.
+  function spreche(text, key) {
+    if (!ttsOn || !text) return;
+    key = key || text;
+    if (key === ttsLastKey) return;
+    ttsLastKey = key;
+
+    // Laufende Ausgabe stoppen
+    if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+
+    // MP3 versuchen
+    var audio = new Audio("audio/" + key + ".mp3");
+    audio.onerror = function () { webSpeechFallback(text); };
+    ttsAudio = audio;
+    audio.play().catch(function () { webSpeechFallback(text); });
   }
 
   function toggleTTS() {
     ttsOn = !ttsOn;
     localStorage.setItem("moony-tts", ttsOn ? "1" : "0");
-    if (!ttsOn && window.speechSynthesis) window.speechSynthesis.cancel();
+    if (!ttsOn) {
+      if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+    }
     ttsLastKey = ""; // nach Toggle: aktuellen Text neu sprechen
     render();        // Knopf-Symbol aktualisieren
   }
@@ -81,6 +103,62 @@
   function esc(t) {
     return String(t == null ? "" : t)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  /* ---------- Fortschritt pro Schüler (localStorage) ---------- */
+
+  function ladeAlleSchueler() {
+    try { return JSON.parse(localStorage.getItem("moony-schueler") || "{}"); } catch (e) { return {}; }
+  }
+  function ladeProgress() {
+    if (!aktuellerSchueler) return {};
+    return ladeAlleSchueler()[aktuellerSchueler] || {};
+  }
+  function speichereAbschluss(idx) {
+    if (!aktuellerSchueler) return;
+    var alle = ladeAlleSchueler();
+    var p = alle[aktuellerSchueler] || {};
+    p.abgeschlossen = p.abgeschlossen || [];
+    if (p.abgeschlossen.indexOf(idx) < 0) p.abgeschlossen.push(idx);
+    p.freigeschaltet = Math.max(p.freigeschaltet || 0, idx + 1);
+    alle[aktuellerSchueler] = p;
+    localStorage.setItem("moony-schueler", JSON.stringify(alle));
+  }
+  function istAbgeschlossen(idx) {
+    return (ladeProgress().abgeschlossen || []).indexOf(idx) >= 0;
+  }
+  function freigeschaltetBis() {
+    return ladeProgress().freigeschaltet || 0;
+  }
+
+  // 💾 Fortschritt als JSON-Datei herunterladen
+  function exportProgress() {
+    if (!aktuellerSchueler) return;
+    var data = { name: aktuellerSchueler, fortschritt: ladeProgress(), version: 1 };
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = "moony-" + aktuellerSchueler.replace(/\s+/g, "-") + ".json";
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+
+  // 📂 Fortschritt aus JSON-Datei laden
+  function importProgress(file) {
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      try {
+        var data = JSON.parse(e.target.result);
+        if (!data.name || !data.fortschritt) throw new Error("Ungültige Datei");
+        var alle = ladeAlleSchueler();
+        alle[data.name] = data.fortschritt;
+        localStorage.setItem("moony-schueler", JSON.stringify(alle));
+        aktuellerSchueler = data.name;
+        localStorage.setItem("moony-aktuell", aktuellerSchueler);
+        renderOverview();
+      } catch (err) { alert("Datei konnte nicht geladen werden. Bitte eine gültige Moony-Datei wählen."); }
+    };
+    reader.readAsText(file);
   }
 
   /* ---------- Block-Erkennung (alle Arbeitsflächen) ---------- */
@@ -280,7 +358,8 @@
     return '<div class="terminal-head">' +
       '<span class="terminal-title">Missionsterminal</span>' +
       '<span class="terminal-mission">Mission ' + esc(m.id) + ' — ' + esc(m.titel) + '</span>' +
-      '<button id="btn-tts" title="Sprachausgabe ein/aus" style="background:none;border:none;cursor:pointer;font-size:15px;opacity:0.75;padding:2px 6px;margin-left:auto;flex-shrink:0;">' + ttsSymbol + '</button>' +
+      '<button id="btn-overview" title="Missionsübersicht" style="background:none;border:none;cursor:pointer;font-size:15px;opacity:0.75;padding:2px 4px;margin-left:auto;flex-shrink:0;">📋</button>' +
+      '<button id="btn-tts" title="Sprachausgabe ein/aus" style="background:none;border:none;cursor:pointer;font-size:15px;opacity:0.75;padding:2px 6px;flex-shrink:0;">' + ttsSymbol + '</button>' +
       '</div>';
   }
 
@@ -301,11 +380,10 @@
     }
 
     if (sIndex >= m.schritte.length) { // Abschluss
+      speichereAbschluss(mIndex);       // Fortschritt speichern
       html += bubble(m.abschluss || "Mission abgeschlossen!") + energyBar();
       html += '<div class="terminal-actions">';
-      html += (mIndex + 1 < missions.length)
-        ? '<button class="m-btn primary" id="m-next-mission">Nächste Mission</button>'
-        : '<div class="m-done">✔ Mission abgeschlossen</div>';
+      html += '<button class="m-btn primary" id="m-next-mission">Zur Missionsübersicht</button>';
       html += '</div>';
       panel.innerHTML = html; bind();
       spreche(m.abschluss || "Mission abgeschlossen!", "d" + mIndex);
@@ -338,6 +416,157 @@
   function renderAllDone() {
     panel.innerHTML = '<div class="terminal-head"><span class="terminal-title">Missionsterminal</span></div>' +
       bubble("Alle Missionen geschafft, Operator. Stark!") + energyBar();
+  }
+
+  /* ---------- Name-Screen ---------- */
+
+  function renderNameScreen() {
+    var alle = ladeAlleSchueler();
+    var namen = Object.keys(alle);
+    var ttsSymbol = ttsOn ? "🔊" : "🔇";
+
+    var html = '<div class="terminal-head">' +
+      '<span class="terminal-title">Missionsterminal</span>' +
+      '<span class="terminal-mission">Moony – Das Schwarmprotokoll</span>' +
+      '<button id="btn-tts" title="Sprachausgabe" style="background:none;border:none;cursor:pointer;font-size:15px;opacity:0.75;padding:2px 6px;margin-left:auto;flex-shrink:0;">' + ttsSymbol + '</button>' +
+      '</div>';
+
+    html += bubble("Operator? Wer bist du? Ich brauche deinen Namen um deinen Fortschritt zu speichern.");
+
+    // Bekannte Schüler
+    if (namen.length > 0) {
+      html += '<p style="font-size:11px;font-weight:500;opacity:.6;text-transform:uppercase;letter-spacing:.04em;margin:14px 0 8px;">Bekannte Personen</p>';
+      namen.forEach(function (name) {
+        var p = alle[name] || {};
+        var count = (p.abgeschlossen || []).length;
+        var max   = missions.length;
+        html += '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;margin-bottom:6px;' +
+          'background:var(--color-background-secondary);border-radius:var(--border-radius-lg);' +
+          'border:0.5px solid var(--color-border-tertiary);">' +
+          '<span style="font-size:18px;">👤</span>' +
+          '<div style="flex:1;">' +
+            '<div style="font-size:14px;font-weight:500;">' + esc(name) + '</div>' +
+            '<div style="font-size:11px;opacity:.6;">' + count + ' von ' + max + ' Missionen abgeschlossen</div>' +
+          '</div>' +
+          '<button class="m-btn primary" data-name="' + esc(name) + '">Auswählen</button>' +
+          '</div>';
+      });
+    }
+
+    // Neuer Schüler
+    html += '<p style="font-size:11px;font-weight:500;opacity:.6;text-transform:uppercase;letter-spacing:.04em;margin:14px 0 8px;">Neue Person</p>';
+    html += '<div style="display:flex;gap:8px;">' +
+      '<input id="neuer-name" type="text" placeholder="Deinen Namen eingeben …" ' +
+      'style="flex:1;padding:8px 12px;border-radius:var(--border-radius-md);' +
+      'border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);' +
+      'color:var(--color-text-primary);font-size:14px;">' +
+      '<button class="m-btn primary" id="btn-neuer-name">Los!</button>' +
+      '</div>';
+
+    // Import
+    html += '<div style="margin-top:12px;">' +
+      '<button class="m-btn" id="btn-import-trigger" style="width:100%;justify-content:center;">📂 Fortschritt von Datei laden</button>' +
+      '<input type="file" id="file-import" accept=".json" style="display:none;"></div>';
+
+    panel.innerHTML = html;
+
+    // Bekannten Schüler auswählen
+    panel.querySelectorAll("[data-name]").forEach(function (btn) {
+      btn.onclick = function () {
+        aktuellerSchueler = this.getAttribute("data-name");
+        localStorage.setItem("moony-aktuell", aktuellerSchueler);
+        renderOverview();
+      };
+    });
+
+    // Neuen Schüler anlegen
+    function neuerName() {
+      var name = (document.getElementById("neuer-name") || {}).value || "";
+      name = name.trim();
+      if (!name) { alert("Bitte einen Namen eingeben."); return; }
+      aktuellerSchueler = name;
+      localStorage.setItem("moony-aktuell", aktuellerSchueler);
+      // Neuen Eintrag anlegen falls noch nicht vorhanden
+      var alle2 = ladeAlleSchueler();
+      if (!alle2[name]) { alle2[name] = {}; localStorage.setItem("moony-schueler", JSON.stringify(alle2)); }
+      renderOverview();
+    }
+    var btnNeu = document.getElementById("btn-neuer-name");
+    if (btnNeu) btnNeu.onclick = neuerName;
+    var inputName = document.getElementById("neuer-name");
+    if (inputName) inputName.addEventListener("keydown", function (e) { if (e.key === "Enter") neuerName(); });
+
+    // Import
+    var btnImport = document.getElementById("btn-import-trigger");
+    var fileInput  = document.getElementById("file-import");
+    if (btnImport) btnImport.onclick = function () { fileInput.click(); };
+    if (fileInput) fileInput.onchange = function () { if (this.files[0]) importProgress(this.files[0]); };
+
+    var ttsBtn = document.getElementById("btn-tts");
+    if (ttsBtn) ttsBtn.onclick = toggleTTS;
+  }
+
+  /* ---------- Missionsübersicht ---------- */
+
+  function renderOverview() {
+    var frei = freigeschaltetBis();
+    var ttsSymbol = ttsOn ? "🔊" : "🔇";
+
+    var html = '<div class="terminal-head">' +
+      '<span class="terminal-title">Missionsterminal</span>' +
+      '<span class="terminal-mission">Moony – Das Schwarmprotokoll</span>' +
+      '<button id="btn-tts" title="Sprachausgabe ein/aus" style="background:none;border:none;cursor:pointer;font-size:15px;opacity:0.75;padding:2px 6px;margin-left:auto;flex-shrink:0;">' + ttsSymbol + '</button>' +
+      '</div>';
+
+    // Schüler-Info-Leiste
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;margin-bottom:10px;' +
+      'background:var(--color-background-secondary);border-radius:var(--border-radius-md);' +
+      'border:0.5px solid var(--color-border-tertiary);font-size:13px;">' +
+      '<span>👤</span><span style="flex:1;font-weight:500;">' + esc(aktuellerSchueler) + '</span>' +
+      '<button class="m-btn" id="btn-export" style="font-size:12px;padding:3px 9px;">💾 Speichern</button>' +
+      '<button class="m-btn" id="btn-wechseln" style="font-size:12px;padding:3px 9px;">Wechseln</button>' +
+      '</div>';
+
+    html += '<p style="font-size:12px;opacity:.6;margin-bottom:10px;">Wähle eine Mission:</p>';
+
+    missions.forEach(function (m, i) {
+      var done    = istAbgeschlossen(i);
+      var locked  = i > frei;
+      var icon    = done ? "✅" : locked ? "🔒" : "📡";
+      var opacity = locked ? "opacity:.4;" : "";
+      var btnHtml = locked ? "" :
+        '<button class="m-btn' + (done ? "" : " primary") + '" data-idx="' + i + '" style="flex-shrink:0;">' +
+        (done ? "Wiederholen" : "Starten") + '</button>';
+
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:8px;' +
+        'background:var(--color-background-secondary);border-radius:var(--border-radius-lg);' +
+        'border:0.5px solid var(--color-border-tertiary);' + opacity + '">' +
+        '<span style="font-size:20px;flex-shrink:0;">' + icon + '</span>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:11px;opacity:.6;font-weight:500;text-transform:uppercase;letter-spacing:.04em;">Mission ' + esc(m.id) + '</div>' +
+          '<div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(m.titel) + '</div>' +
+        '</div>' + btnHtml + '</div>';
+    });
+
+    panel.innerHTML = html;
+
+    // Missions-Knöpfe
+    panel.querySelectorAll("[data-idx]").forEach(function (btn) {
+      btn.onclick = function () {
+        mIndex = parseInt(this.getAttribute("data-idx"));
+        sIndex = -1; energie = 0; hinweis = ""; ttsLastKey = "";
+        render();
+      };
+    });
+
+    document.getElementById("btn-export").onclick = exportProgress;
+    document.getElementById("btn-wechseln").onclick = function () {
+      aktuellerSchueler = "";
+      localStorage.removeItem("moony-aktuell");
+      renderNameScreen();
+    };
+    var ttsBtn = document.getElementById("btn-tts");
+    if (ttsBtn) ttsBtn.onclick = toggleTTS;
   }
 
   // ---- DIAGNOSE ----
@@ -430,12 +659,13 @@
     };
 
     var nextM = document.getElementById("m-next-mission");
-    if (nextM) nextM.onclick = function () {
-      mIndex += 1; goTo(-1);
-    };
+    if (nextM) nextM.onclick = function () { renderOverview(); };
 
     var ttsBtn = document.getElementById("btn-tts");
     if (ttsBtn) ttsBtn.onclick = toggleTTS;
+
+    var ovBtn = document.getElementById("btn-overview");
+    if (ovBtn) ovBtn.onclick = function () { renderOverview(); };
   }
 
   /* ---------- Verbindung zur App ---------- */
@@ -470,11 +700,11 @@
         "<p style='font-size:13px;opacity:.7'>Keine Missionen gefunden.</p>";
       return;
     }
-    initTTS();  // Stimmen laden (Phase C)
-    document.body.classList.add("mission-active"); // beim Start sichtbar
+    initTTS();
+    document.body.classList.add("mission-active");
     resizeBlockly(); setTimeout(resizeBlockly, 300);
     attachListeners();
-    render();
+    if (aktuellerSchueler) renderOverview(); else renderNameScreen();
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
